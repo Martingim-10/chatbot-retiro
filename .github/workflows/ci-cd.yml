@@ -1,0 +1,43 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Authenticate with GCP
+        env:
+          GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+        run: |
+          echo "$GCP_CREDENTIALS" > cred.json
+          gcloud auth activate-service-account --key-file=cred.json
+
+      - name: Deploy Cloud Function
+        env:
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: |
+          gcloud functions deploy chatbotWebhook \
+            --runtime nodejs18 \
+            --trigger-http \
+            --allow-unauthenticated \
+            --set-env-vars SHEET_ID=$SHEET_ID,GOOGLE_CREDENTIALS="$(cat cred.json)"
+
