@@ -1,16 +1,14 @@
-# .github/workflows/ci-cd.yml
 name: CI/CD
 
 on:
   push:
-    branches: [ main ]  # cámbialo a "principal" si tu rama principal se llama así
+    branches: [ main ]        # o [ principal ] si tu rama principal se llama así
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -24,8 +22,7 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       - name: Authenticate with GCP
         env:
@@ -33,25 +30,18 @@ jobs:
         run: |
           echo "$GCP_CREDENTIALS" > cred.json
           gcloud auth activate-service-account --key-file=cred.json
-
-      - name: Set GCP project
-        env:
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-        run: |
-          gcloud config set project $GCP_PROJECT_ID
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Deploy Cloud Function
         env:
-          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-          SHEET_ID:        ${{ secrets.SHEET_ID }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
         run: |
           gcloud functions deploy chatbotWebhook \
-            --project=$GCP_PROJECT_ID \
             --region=us-central1 \
             --runtime=nodejs18 \
             --trigger-http \
             --allow-unauthenticated \
-            --set-env-vars=PROJECT_ID=$GCP_PROJECT_ID,SHEET_ID=$SHEET_ID,GOOGLE_CREDENTIALS="$(cat cred.json)"
+            --set-env-vars SHEET_ID=$SHEET_ID,GOOGLE_CREDENTIALS="$(< cred.json)"
 
       - name: Register social channels
         env:
@@ -60,4 +50,3 @@ jobs:
           CLOUD_FUNCTION_URL: https://us-central1-${{ secrets.GCP_PROJECT_ID }}.cloudfunctions.net/chatbotWebhook
         run: |
           bash scripts/register-channels.sh
-
