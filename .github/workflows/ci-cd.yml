@@ -39,5 +39,5 @@ jobs:
             --runtime nodejs18 \
             --trigger-http \
             --allow-unauthenticated \
-            --set-env-vars SHEET_ID=$SHEET_ID,GOOGLE_CREDENTIALS="$(cat cred.json)"
+            --set-env-vars SHEET_ID=$SHEET_ID
 
