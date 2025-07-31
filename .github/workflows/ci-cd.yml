@@ -1,30 +1,57 @@
-deploy:
-  needs: build
-  runs-on: ubuntu-latest
-  env:
-    # Crea antes este secreto en Settings → Secrets:
-    #   Name: GCP_PROJECT_ID
-    #   Value: tu ID de proyecto (por ej. chatbotprevencionretiro)
-    PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-    SHEET_ID:    ${{ secrets.SHEET_ID }}
-  steps:
-    - uses: actions/checkout@v3
+name: CI/CD
 
-    - name: Authenticate with GCP
-      run: |
-        echo "${{ secrets.GCP_CREDENTIALS }}" > cred.json
-        gcloud auth activate-service-account --key-file=cred.json
+on:
+  push:
+    branches: [ main ]    # Cambia a [ principal ] si tu rama principal se llama así
 
-    - name: Set GCP project
-      run: |
-        gcloud config set project $PROJECT_ID
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-    - name: Deploy Cloud Function
-      run: |
-        gcloud functions deploy chatbotWebhook \
-          --project      $PROJECT_ID \
-          --region       us-central1 \
-          --runtime      nodejs18 \
-          --trigger-http \
-          --allow-unauthenticated \
-          --set-env-vars SHEET_ID=$SHEET_ID
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      # Crea antes estos secretos en Settings → Secrets → Actions
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+      SHEET_ID:        ${{ secrets.SHEET_ID }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Authenticate with GCP
+        run: |
+          echo "$GCP_CREDENTIALS" > cred.json
+          gcloud auth activate-service-account --key-file=cred.json
+
+      - name: Set GCP project
+        run: |
+          gcloud config set project $GCP_PROJECT_ID
+
+      - name: Deploy Cloud Function
+        run: |
+          gcloud functions deploy chatbotWebhook \
+            --region=us-central1 \
+            --runtime=nodejs18 \
+            --trigger-http \
+            --allow-unauthenticated \
+            --set-env-vars SHEET_ID=$SHEET_ID,GOOGLE_CREDENTIALS="$(cat cred.json)"
+
+      - name: Register social channels
+        env:
+          FB_PAGE_TOKEN:     ${{ secrets.FB_PAGE_TOKEN }}
+          TG_BOT_TOKEN:      ${{ secrets.TG_BOT_TOKEN }}
+          CLOUD_FUNCTION_URL: https://us-central1-${{ secrets.GCP_PROJECT_ID }}.cloudfunctions.net/chatbotWebhook
+        run: |
+          bash scripts/register-channels.sh
+
