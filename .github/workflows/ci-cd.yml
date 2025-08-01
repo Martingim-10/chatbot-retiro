@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main ]        # o [ principal ] si tu rama principal se llama así...
+    branches: [ main ]        # o [ principal ] si tu rama principal se llama así..
 
 jobs:
   build:
