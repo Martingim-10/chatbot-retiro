@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [ main ]        # o [ principal ] si tu rama principal se llama así..
+    branches: [ main ]
 
 jobs:
   build:
@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
@@ -27,17 +27,20 @@ jobs:
       - name: Authenticate with GCP
         env:
           GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
-          GCP_PROJECT_ID:  ${{ secrets.GCP_PROJECT_ID }}
         run: |
-          echo "$GCP_CREDENTIALS" > cred.json
-          gcloud auth activate-service-account --key-file=cred.json
-          gcloud config set project $GCP_PROJECT_ID
+          echo "$GCP_CREDENTIALS" > key.json
+          gcloud auth activate-service-account --key-file=key.json
+
+      - name: Set GCP project
+        run: |
+          gcloud config set project ${{ secrets.GCP_PROJECT_ID }}
 
       - name: Deploy Cloud Function
         env:
           SHEET_ID: ${{ secrets.SHEET_ID }}
         run: |
           gcloud functions deploy chatbotWebhook \
+            --entry-point=chatbotWebhook \
             --region=us-central1 \
             --runtime=nodejs18 \
             --trigger-http \
@@ -45,9 +48,11 @@ jobs:
             --set-env-vars SHEET_ID=$SHEET_ID
 
       - name: Register social channels
+        if: success()
         env:
-          FB_PAGE_TOKEN:     ${{ secrets.FB_PAGE_TOKEN }}
-          TG_BOT_TOKEN:      ${{ secrets.TG_BOT_TOKEN }}
-          CLOUD_FUNCTION_URL: https://us-central1-${{ secrets.GCP_PROJECT_ID }}.cloudfunctions.net/chatbotWebhook
+          FB_PAGE_TOKEN:    ${{ secrets.FB_PAGE_TOKEN }}
+          TG_BOT_TOKEN:     ${{ secrets.TG_BOT_TOKEN }}
+          FUNCTION_URL:     https://us-central1-${{ secrets.GCP_PROJECT_ID }}.cloudfunctions.net/chatbotWebhook
         run: |
           bash scripts/register-channels.sh
+
